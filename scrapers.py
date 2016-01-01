@@ -3,6 +3,9 @@ from bs4 import BeautifulSoup
 from urllib2 import urlopen, quote, unquote
 import sys, re, datetime
 
+from collections import namedtuple
+Posting = namedtuple('Posting', 'title href price date address bdrm sqft mailto')
+
 # *** General search options ***
 MAX_SCRAPED_PAGES = 10
 
@@ -48,7 +51,10 @@ def scrape_craigslist():
             sys.stdout.write(".")
             sys.stdout.flush()
             link = listing.find(class_="pl").a
-            href = root_url + link.get("href")
+            if link.get("href").startswith("//"):
+                href = "http:" + link.get("href")
+            else:
+                href = root_url + link.get("href")
             title = link.string
             try:
                 price = listing.find(class_='price').string
@@ -57,13 +63,13 @@ def scrape_craigslist():
             # Find square footage and bedroom count
             try:
                 sqft = bdrm = None
-                details = listing.find(class_='pnr')
+                details = listing.find(class_='housing')
                 for s in details.strings:
                     if not sqft:
                         sqft = re.search(SQFT_REGEXP, s)
                     if not bdrm:
                         bdrm = re.search(BDRM_REGEXP, s)
-            except AttributeError:
+            except AttributeError, e:
                 pass
             # Check for fewer than minimum bedrooms, or unspecified
             if not bdrm or int(bdrm.group(0)[:-2]) < MIN_BDRM:
@@ -77,7 +83,7 @@ def scrape_craigslist():
                     continue
             bdrm = bdrm.group(0)[:-2] if bdrm else "could not find bedroom count"
             sqft = sqft.group(0)[:-2] if sqft else "could not find sqft count"
-            date = listing.find(class_='date').string
+            date = listing.select('time')[0].string
             lat = listing.get("data-latitude")
             lng = listing.get("data-longitude")
             maps_link = "https://maps.google.com/maps?q=%s+%s"%(lat,lng) if lat and lng else "could not find location"
@@ -120,7 +126,7 @@ def scrape_craigslist():
             else:
                 mailto = "no email address?"
 
-            results.append((title,href,price,date,maps_link,bdrm,sqft,mailto))
+            results.append(Posting(title,href,price,date,maps_link,bdrm,sqft,mailto))
 
     print
     return results
@@ -155,7 +161,7 @@ def scrape_trulia():
         # Never lists the date, so use today (date scraped)
         date = datetime.datetime.now().strftime("%m/%d/%Y")
 
-        results.append((title,href,price,date,address,bdrm,sqft))
+        results.append(Posting(title,href,price,date,address,bdrm,sqft))
 
     print
     return results
