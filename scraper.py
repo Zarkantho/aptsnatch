@@ -6,21 +6,10 @@ import scrapers
 import argparse
 from oauth import get_credentials, clear_credentials
 
-# IMPORTANT: Set these to your Google acct username and password
-GOOGLE_USER = "username"
-GOOGLE_PW = "password"
-
-# *** Set the search criteria ***
-MAX_PRICE = 1400
-# Must have this many bedrooms-
-MIN_BDRM = 1
-# -OR have at least this square footage
-MIN_SQFT = 800
-# Search terms
-KEYWORDS = ("tenleytown",)
-
-def post_listings(listings, use_oauth=True):
-    if use_oauth:
+def post_listings(listings, sheet_name, username=None, password=None):
+    if username or password:
+        google = gspread.login(username, password)
+    else:
         credentials = get_credentials()
         try:
             google = gspread.authorize(credentials)
@@ -28,10 +17,8 @@ def post_listings(listings, use_oauth=True):
             print "Exception trying to authenticate with google: %s" % e
             print "Clearing any credentials saved in keyring..."
             clear_credentials()
-    else:
-        google = gspread.login(GOOGLE_USER, GOOGLE_PW)
 
-    spread = google.open("Snatched Apartments").sheet1
+    spread = google.open(sheet_name).sheet1
 
     # Retrieve listings already in the spreadsheet, and use these to
     # filter current <listings> to prevent duplicates. We consider two
@@ -40,7 +27,7 @@ def post_listings(listings, use_oauth=True):
     listings = [l for l in listings if l[1] not in cur_listings]
 
     if len(cur_listings) == 0:
-        print "Sheet is empty, adding title line."
+        print "Sheet %s is empty, adding title line." % sheet_name
         for col, header in enumerate(['Title', 'Link', 'Price', 'Date Posted', 'Location',
             'Bedrooms', 'Square Feet', 'Email'], 1):
             spread.update_cell(1, col, header)
@@ -72,15 +59,25 @@ def csv_listings(listings):
         print ",".join([listing.title, listing.href, price, listing.date, address, bdrm, sqft, mailto])
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    root_url = "http://washingtondc.craigslist.org"
-    scrape_funcs = [f for f in dir(scrapers) if f.startswith('scrape_')]
-    all_scraped = [getattr(scrapers,scrape_func)(root_url=root_url, keywords=KEYWORDS,
-        max_price=MAX_PRICE, min_bedrooms=MIN_BDRM, min_square_feet=MIN_SQFT) for scrape_func in
-        scrape_funcs]
-    listings = []
-    for scraped in all_scraped:
-        listings.extend(scraped)
-
-    csv_listings(listings)
-    post_listings(listings)
+    parser = argparse.ArgumentParser("Parse craigslist and upload to a google spreadsheet",
+            formatter_class=argparse.ArgumentDefaultsHelpFormatter)
+    parser.add_argument("--csv", help="Output as csv rather than uploading to a google "
+            "spreadsheet", action="store_true")
+    parser.add_argument("--sheet-name", help="Spreadsheet name", default="Snatched Apartments")
+    parser.add_argument("--craigslist-url", help="Craigslist URL for your location",
+            default="http://washingtondc.craigslist.org")
+    parser.add_argument("--keywords", help="Comma separated list of search keywords",
+            default="friendship heights,tenleytown")
+    parser.add_argument("--max-price", help="Maximum monthly rent", default=1000, type=int)
+    parser.add_argument("--min-bedrooms", help="Minimum number of bedrooms", default=1, type=int)
+    parser.add_argument("--min-square-feet", help="Minimum square feet", default=800, type=int)
+    parser.add_argument("--username", help="Google username.  Don't set this or --password to use oauth.")
+    parser.add_argument("--password", help="Google password.  Don't set this or --username to use oauth.")
+    args = parser.parse_args()
+    listings = scrapers.scrape_craigslist(root_url=args.craigslist_url, keywords=args.keywords.split(","),
+            max_price=args.max_price, min_bedrooms=args.min_bedrooms,
+            min_square_feet=args.min_square_feet)
+    if args.csv:
+        csv_listings(listings)
+    else:
+        post_listings(listings, args.sheet_name, args.username, args.password)

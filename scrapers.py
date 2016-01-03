@@ -28,13 +28,14 @@ def fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_fee
     """Fetch craigslist pages, one per each keyword."""
     print "Fetching craigslist page..."
     pages = []
-    for keyword in KEYWORDS:
+    for keyword in keywords:
         # URL to scrape
         search_url = "/search/apa?zoomToPosting=&query=%s&srchType=A&minAsk=&maxAsk=%d&bedrooms=%d"%(
             '+'.join(keyword.split()),
             max_price,
             min_bedrooms
         )
+        print root_url + search_url
         page = urlopen(root_url + search_url).read()
         pages.append(page)
     return pages
@@ -145,6 +146,7 @@ def scrape_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_fe
     postings = [posting for posting in postings if meets_requirements(posting)]
     return postings
 
+# TODO: Reenable this scraper
 def no_scrape_trulia():
     root_url = "http://www.trulia.com"
     search_url = "/for_rent/1453_nh/%dp_beds/0-%d_price/date;d_sort/"%(
