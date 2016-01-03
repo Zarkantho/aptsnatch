@@ -8,6 +8,15 @@ import scrapers
 GOOGLE_USER = "username"
 GOOGLE_PW = "password"
 
+# *** Set the search criteria ***
+MAX_PRICE = 5000
+# Must have this many bedrooms-
+MIN_BDRM = 1
+# -OR have at least this square footage
+MIN_SQFT = 800
+# Search terms
+KEYWORDS = ("tenleytown",)
+
 def post_listings(listings):
     google = gspread.login(GOOGLE_USER, GOOGLE_PW)
     spread = google.open("Snatched Apartments").sheet1
@@ -32,12 +41,25 @@ def post_listings(listings):
     for row, listing in enumerate(listings, len(cur_listings)+1):
         for col, datum in enumerate(listing, 1):
             spread.update_cell(row, col, datum)
-        
+
+def csv_listings(listings):
+    print ",".join(['title', 'href', 'price', 'date', 'address', 'bdrm', 'sqft', 'mailto'])
+    for listing in listings:
+        bdrm = listing.bdrm if listing.bdrm else "could not find bedroom count"
+        sqft = listing.sqft if listing.sqft else "could not find sqft count"
+        price = listing.price if listing.price else "could not find price"
+        address = listing.address if listing.address else "could not find location"
+        mailto = listing.mailto if listing.mailto else "could not find email address"
+        print ",".join([listing.title, listing.href, price, listing.date, address, bdrm, sqft, mailto])
+
 if __name__ == '__main__':
+    root_url = "http://washingtondc.craigslist.org"
     scrape_funcs = [f for f in dir(scrapers) if f.startswith('scrape_')]
-    all_scraped = [getattr(scrapers,scrape_func)() for scrape_func in scrape_funcs]
+    all_scraped = [getattr(scrapers,scrape_func)(root_url=root_url, keywords=KEYWORDS,
+        max_price=MAX_PRICE, min_bedrooms=MIN_BDRM, min_square_feet=MIN_SQFT) for scrape_func in
+        scrape_funcs]
     listings = []
     for scraped in all_scraped:
         listings.extend(scraped)
 
-    post_listings(listings)
+    csv_listings(listings)
