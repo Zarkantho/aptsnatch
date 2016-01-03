@@ -4,7 +4,7 @@ from urllib2 import urlopen, quote, unquote
 import sys, re, datetime
 
 from collections import namedtuple
-Posting = namedtuple('Posting', 'title href price date address bdrm sqft mailto')
+Posting = namedtuple('Posting', 'title href price date address bdrm sqft mailto query')
 
 # *** Set the search criteria ***
 MAX_PRICE = 5000
@@ -26,7 +26,6 @@ CL_ER_REGEXP = re.compile("(mailto:(.*?)\?)|(mailto:(.*))")
 
 def fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_feet):
     """Fetch craigslist pages, one per each keyword."""
-    print "Fetching craigslist page..."
     pages = []
     for keyword in keywords:
         # URL to scrape
@@ -35,9 +34,9 @@ def fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_fee
             max_price,
             min_bedrooms
         )
-        print root_url + search_url
+        print "Fetching Craigslist search page: %s" % (root_url + search_url)
         page = urlopen(root_url + search_url).read()
-        pages.append(page)
+        pages.append((keyword, page))
     return pages
 
 def parse_mailto(listing_page):
@@ -86,9 +85,9 @@ def parse_location(listing_page):
     lng = map_divs[0].attrs['data-longitude']
     return (lat, lng)
 
-def parse_craigslist(root_url, page):
+def parse_craigslist(root_url, page, keyword):
     """Parse a craigslist result page and return an array of listings found on that page."""
-    print "Parsing craigslist page..."
+    print "Parsing Craigslist Search page for query \"%s\"..." % keyword
     results = []
     soup = BeautifulSoup(page)
     listings = soup.find_all('p', class_='row')
@@ -123,7 +122,7 @@ def parse_craigslist(root_url, page):
         mailto = parse_mailto(listing_page)
         (lat, lng) = parse_location(listing_page)
         maps_link = "https://maps.google.com/maps?q=%s+%s"%(lat,lng) if lat and lng else None
-        results.append(Posting(title,href,price,date,maps_link,bdrm,sqft,mailto))
+        results.append(Posting(title,href,price,date,maps_link,bdrm,sqft,mailto,keyword))
 
     print
     return results
@@ -134,8 +133,8 @@ def scrape_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_fe
     pages = []
     pages = fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_feet)
     postings = []
-    for page in pages:
-        postings.extend(parse_craigslist(root_url, page))
+    for keyword, page in pages:
+        postings.extend(parse_craigslist(root_url, page, keyword))
     def meets_requirements(posting):
         # Check for fewer than minimum bedrooms, or unspecified
         if not posting.bdrm or posting.bdrm < min_bedrooms:

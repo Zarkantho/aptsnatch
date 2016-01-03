@@ -29,7 +29,7 @@ def post_listings(listings, sheet_name, username=None, password=None):
     if len(cur_listings) == 0:
         print "Sheet %s is empty, adding title line." % sheet_name
         for col, header in enumerate(['Title', 'Link', 'Price', 'Date Posted', 'Location',
-            'Bedrooms', 'Square Feet', 'Email'], 1):
+            'Bedrooms', 'Square Feet', 'Email', 'Search Terms'], 1):
             spread.update_cell(1, col, header)
         cur_listings.append('Link')
 
@@ -49,14 +49,14 @@ def post_listings(listings, sheet_name, username=None, password=None):
             spread.update_cell(row, col, datum)
 
 def csv_listings(listings):
-    print ",".join(['title', 'href', 'price', 'date', 'address', 'bdrm', 'sqft', 'mailto'])
+    print ",".join(['title', 'href', 'price', 'date', 'address', 'bdrm', 'sqft', 'mailto', 'query'])
     for listing in listings:
         bdrm = listing.bdrm if listing.bdrm else "could not find bedroom count"
         sqft = listing.sqft if listing.sqft else "could not find sqft count"
         price = listing.price if listing.price else "could not find price"
         address = listing.address if listing.address else "could not find location"
         mailto = listing.mailto if listing.mailto else "could not find email address"
-        print ",".join([listing.title, listing.href, price, listing.date, address, bdrm, sqft, mailto])
+        print ",".join([listing.title, listing.href, price, listing.date, address, bdrm, sqft, mailto, listing.query])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Parse craigslist and upload to a google spreadsheet",
