@@ -17,6 +17,7 @@ def post_listings(listings, sheet_name, username=None, password=None):
             print "Exception trying to authenticate with google: %s" % e
             print "Clearing any credentials saved in keyring..."
             clear_credentials()
+            sys.exit(1)
 
     spread = google.open(sheet_name).sheet1
 
