@@ -56,7 +56,8 @@ def csv_listings(listings):
         price = listing.price if listing.price else "could not find price"
         address = listing.address if listing.address else "could not find location"
         mailto = listing.mailto if listing.mailto else "could not find email address"
-        print ",".join([listing.title, listing.href, price, listing.date, address, bdrm, sqft, mailto, listing.query])
+        title = listing.title.replace(",", ".")
+        print ",".join([title, listing.href, price, listing.date, address, bdrm, sqft, mailto, listing.query])
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser("Parse craigslist and upload to a google spreadsheet",
