@@ -3,13 +3,15 @@ from urllib2 import urlopen
 import gspread
 import sys
 import scrapers
+import argparse
+from oauth import get_credentials, clear_credentials
 
 # IMPORTANT: Set these to your Google acct username and password
 GOOGLE_USER = "username"
 GOOGLE_PW = "password"
 
 # *** Set the search criteria ***
-MAX_PRICE = 5000
+MAX_PRICE = 1400
 # Must have this many bedrooms-
 MIN_BDRM = 1
 # -OR have at least this square footage
@@ -17,15 +19,32 @@ MIN_SQFT = 800
 # Search terms
 KEYWORDS = ("tenleytown",)
 
-def post_listings(listings):
-    google = gspread.login(GOOGLE_USER, GOOGLE_PW)
+def post_listings(listings, use_oauth=True):
+    if use_oauth:
+        credentials = get_credentials()
+        try:
+            google = gspread.authorize(credentials)
+        except Exception, e:
+            print "Exception trying to authenticate with google: %s" % e
+            print "Clearing any credentials saved in keyring..."
+            clear_credentials()
+    else:
+        google = gspread.login(GOOGLE_USER, GOOGLE_PW)
+
     spread = google.open("Snatched Apartments").sheet1
 
     # Retrieve listings already in the spreadsheet, and use these to
     # filter current <listings> to prevent duplicates. We consider two
     # listings different from each other if their links don't match
-    cur_listings = spread.col_values(2)
+    cur_listings = [l for l in spread.col_values(2) if l]
     listings = [l for l in listings if l[1] not in cur_listings]
+
+    if len(cur_listings) == 0:
+        print "Sheet is empty, adding title line."
+        for col, header in enumerate(['Title', 'Link', 'Price', 'Date Posted', 'Location',
+            'Bedrooms', 'Square Feet', 'Email'], 1):
+            spread.update_cell(1, col, header)
+        cur_listings.append('Link')
 
     if len(listings) > 0:
         plural = "listing" if len(listings) == 1 else "listings"
@@ -53,6 +72,7 @@ def csv_listings(listings):
         print ",".join([listing.title, listing.href, price, listing.date, address, bdrm, sqft, mailto])
 
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
     root_url = "http://washingtondc.craigslist.org"
     scrape_funcs = [f for f in dir(scrapers) if f.startswith('scrape_')]
     all_scraped = [getattr(scrapers,scrape_func)(root_url=root_url, keywords=KEYWORDS,
@@ -63,3 +83,4 @@ if __name__ == '__main__':
         listings.extend(scraped)
 
     csv_listings(listings)
+    post_listings(listings)
