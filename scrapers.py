@@ -6,6 +6,12 @@ import sys, re, datetime
 from collections import namedtuple
 Posting = namedtuple('Posting', 'title href price date address bdrm sqft mailto query')
 
+# Introduce a delay between fetching pages, so Craigslist doesn't block this script
+# TODO: Make this more easily configurable
+import random, time
+ADD_FETCH_DELAY = True
+FETCH_DELAY_MAX_SECS = 10
+
 # *** Set the search criteria ***
 MAX_PRICE = 5000
 # Must have this many bedrooms-
@@ -24,6 +30,14 @@ TCODE_REGEXP = re.compile("{{(.*)}}", flags=re.MULTILINE)
 CL_ES_REGEXP = re.compile("subject=(.*?)&")
 CL_ER_REGEXP = re.compile("(mailto:(.*?)\?)|(mailto:(.*))")
 
+def fetch_page(url):
+    if ADD_FETCH_DELAY:
+        sleep_secs = random.randint(1, FETCH_DELAY_MAX_SECS)
+        print "Sleeping for %s seconds before fetching %s" % (sleep_secs, url)
+        time.sleep(sleep_secs)
+    return urlopen(url).read()
+
+
 def fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_feet):
     """Fetch craigslist pages, one per each keyword."""
     pages = []
@@ -35,7 +49,7 @@ def fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_fee
             min_bedrooms
         )
         print "Fetching Craigslist search page: %s" % (root_url + search_url)
-        page = urlopen(root_url + search_url).read()
+        page = fetch_page(root_url + search_url)
         pages.append((keyword, page))
     return pages
 
@@ -43,7 +57,7 @@ def parse_mailto(root_url, listing_page):
     lsoup = BeautifulSoup(listing_page)
     email_page_link = lsoup.find(attrs={"id":"replylink"})
     try:
-        contact_page = urlopen(root_url + email_page_link.get("href")).read()
+        contact_page = fetch_page(root_url + email_page_link.get("href"))
     except:
         return None
     contact_page_soup = BeautifulSoup(contact_page)
@@ -92,7 +106,7 @@ def parse_craigslist(root_url, page, keyword):
         bdrm = bdrm.group(0)[:-2] if bdrm else None
         sqft = sqft.group(0)[:-2] if sqft else None
         date = listing.select('time')[0].string
-        listing_page = urlopen(href).read()
+        listing_page = fetch_page(href)
         mailto = parse_mailto(root_url, listing_page)
         (lat, lng) = parse_location(listing_page)
         maps_link = "https://maps.google.com/maps?q=%s+%s"%(lat,lng) if lat and lng else None
@@ -128,7 +142,7 @@ def no_scrape_trulia():
     )
 
     sys.stdout.write("Scraping trulio...")
-    page = urlopen(root_url + search_url).read()
+    page = fetch_page(root_url + search_url)
     soup = BeautifulSoup(page)
 
     listings = soup.find_all('li', class_='property-data-elem')
