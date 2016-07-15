@@ -8,6 +8,9 @@ from oauth import get_credentials, clear_credentials
 
 def send_mail(title, link, price, date_posted, location, bedrooms, square_feet, email, search_terms):
 
+    if not email:
+        return
+
     import smtplib
     import os
 
@@ -21,8 +24,7 @@ def send_mail(title, link, price, date_posted, location, bedrooms, square_feet, 
     session.login(GMAIL_USERNAME, GMAIL_PASSWORD)
 
     email_subject = "Looking to live in %s" % title
-    #recipient = "5302057397@vtext.com"
-    recipient = "shaun.verch@gmail.com"
+    recipient = email
 
     import json
 
