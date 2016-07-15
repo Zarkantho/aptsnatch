@@ -6,6 +6,45 @@ import scrapers
 import argparse
 from oauth import get_credentials, clear_credentials
 
+def send_mail(title, link, price, date_posted, location, bedrooms, square_feet, email, search_terms):
+
+    import smtplib
+    import os
+
+    GMAIL_PASSWORD = os.environ['GMAIL_APTSNATCH_APP_SPECIFIC_PASSWORD']
+    GMAIL_USERNAME = 'sverch724'
+
+    # The below code never changes, though obviously those variables need values.
+    session = smtplib.SMTP('smtp.gmail.com', 587)
+    session.ehlo()
+    session.starttls()
+    session.login(GMAIL_USERNAME, GMAIL_PASSWORD)
+
+    email_subject = "Looking to live in %s" % title
+    #recipient = "5302057397@vtext.com"
+    recipient = "shaun.verch@gmail.com"
+
+    import json
+
+    template = open("email_template.txt").read()
+
+    body_of_email = template % {'href':link,'query':search_terms}
+
+    print body_of_email
+
+    # TODO: Use something better to construct this rather than doing it manually.  See:
+    # https://docs.python.org/2/library/email-examples.html#email-examples
+    # TODO: Sent HTML email rather than plaintext?
+    headers = "\r\n".join(["from: " + GMAIL_USERNAME,
+                        "subject: " + email_subject,
+                        "to: " + recipient,
+                        "mime-version: 1.0"])
+
+    # body_of_email can be plaintext or html!
+    content = headers + "\r\n\r\n" + body_of_email
+    session.sendmail(GMAIL_USERNAME, recipient, content)
+    print content
+
 def post_listings(listings, sheet_name, username=None, password=None):
     if username or password:
         google = gspread.login(username, password)
@@ -48,6 +87,19 @@ def post_listings(listings, sheet_name, username=None, password=None):
     for row, listing in enumerate(listings, len(cur_listings)+1):
         for col, datum in enumerate(listing, 1):
             spread.update_cell(row, col, datum)
+
+    print "Sending emails for new postings!"
+
+    for listing in listings:
+        send_mail(title=listing.title,
+                link=listing.href,
+                price=listing.price,
+                date_posted=listing.date,
+                location=listing.address,
+                bedrooms=listing.bdrm,
+                square_feet=listing.sqft,
+                email=listing.mailto,
+                search_terms=listing.query)
 
 def csv_listings(listings):
     print ",".join(['title', 'href', 'price', 'date', 'address', 'bdrm', 'sqft', 'mailto', 'query'])
