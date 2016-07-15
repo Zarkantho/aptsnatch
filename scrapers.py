@@ -39,51 +39,25 @@ def fetch_craigslist(root_url, keywords, max_price, min_bedrooms, min_square_fee
         pages.append((keyword, page))
     return pages
 
-def parse_mailto(listing_page):
-    ##############################
-    # Scrape reply-to email and construct a new mailto link with given template
+def parse_mailto(root_url, listing_page):
     lsoup = BeautifulSoup(listing_page)
-
-    # Craigslist doesn't seem to be consistent with displaying the reply-to link,
-    # so this is the best I could come up with
-    email = lsoup.find(lambda x:x.has_attr("href") and x.get("href").startswith("mailto"))
-    if email:
-        email = email.get("href")
-        email_subj = re.search(CL_ES_REGEXP, email)
-        if email_subj:
-            email_subj = "Interest in your apartment: %s"%unquote(email_subj.group(1)).strip()
-        else:
-            email_subj = "Interested in your apt, as listed on Craigslist"
-        email_rcpt = re.search(CL_ER_REGEXP, email)
-        email_rcpt = email_rcpt.group(2) or email_rcpt.group(4)
-
-        # Evaluate python code in the template surrounded by {{ }}'s
-        # This way, we can fill in blanks in the template that reference var names
-        with open("email_template.txt","r") as template:
-            replacements = {}
-            contents = template.read()
-            for item in re.finditer(TCODE_REGEXP, contents):
-                replacements[item.group(1)] = eval(item.group(1))
-            newstring = None
-            for orig, new in replacements.iteritems():
-                newstring = (newstring or contents).replace('{{%s}}'%orig, str(new))
-
-        # Set new mailto link
-        return "mailto:%s?subject=%s&body=%s" % (
-            email_rcpt,
-            quote(email_subj),
-            quote(newstring)
-        )
-    return None
+    email_page_link = lsoup.find(attrs={"id":"replylink"})
+    try:
+        contact_page = urlopen(root_url + email_page_link.get("href")).read()
+    except:
+        return None
+    contact_page_soup = BeautifulSoup(contact_page)
+    email_element = contact_page_soup.find(attrs={"class":"mailapp"})
+    return email_element.text if email_element else None
 
 def parse_location(listing_page):
     lsoup = BeautifulSoup(listing_page)
     map_divs = lsoup.select("#map")
     if len(map_divs) < 1:
         return (None, None)
-    lat = map_divs[0].attrs['data-latitude']
-    lng = map_divs[0].attrs['data-longitude']
-    return (lat, lng)
+    #lat = map_divs[0].attrs['data-latitude']
+    #lng = map_divs[0].attrs['data-longitude']
+    return (None, None) #(lat, lng)
 
 def parse_craigslist(root_url, page, keyword):
     """Parse a craigslist result page and return an array of listings found on that page."""
@@ -119,7 +93,7 @@ def parse_craigslist(root_url, page, keyword):
         sqft = sqft.group(0)[:-2] if sqft else None
         date = listing.select('time')[0].string
         listing_page = urlopen(href).read()
-        mailto = parse_mailto(listing_page)
+        mailto = parse_mailto(root_url, listing_page)
         (lat, lng) = parse_location(listing_page)
         maps_link = "https://maps.google.com/maps?q=%s+%s"%(lat,lng) if lat and lng else None
         results.append(Posting(title,href,price,date,maps_link,bdrm,sqft,mailto,keyword))
